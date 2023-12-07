@@ -46,6 +46,7 @@ async def mint(to, rpc, private_key, gasPrice, maxFeePerGas, maxPriorityFeePerGa
     if not data.startswith('0x') and subtext is None:
         data = web3.to_hex(text=data)
 
+    # 每次发送100个交易，重复发送time次
     for x in range(0, time):
         request_list = []
         for i in range(0, 100):
@@ -60,7 +61,7 @@ async def mint(to, rpc, private_key, gasPrice, maxFeePerGas, maxPriorityFeePerGa
             nonce += 1
             request_list.append({"jsonrpc": "2.0", "method": "eth_sendRawTransaction", "params": [signed.rawTransaction.hex()], "id": i + 1})
         res = await http.post(rpc, json=request_list)
-        print(res.json())
+        print("batch send.. done")
         await asyncio.sleep(1)
 
 
@@ -89,12 +90,10 @@ async def main():
         _maxFeePerGas = 0
         _maxPriorityFeePerGas = 0
 
-    _data = get_input('输入data：', lambda data: len(data) > 0, 'data不能为空, 请检查后重新输入')
+    _data = get_input('输入data：0x开头的16进制数字', lambda data: len(data) > 0, 'data不能为空, 请检查后重新输入')
 
     await mint(_to, _rpc, _private_key, _gasPrice, _maxFeePerGas, _maxPriorityFeePerGas, _data)
 
 
 if __name__ == '__main__':
-    print('hdd.cm, 推特低至2毛，一手资源，售后无忧')
-    print('https://github.com/Fooyao/evmink; 请仔细阅读README文档')
     asyncio.run(main())

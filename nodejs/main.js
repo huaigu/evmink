@@ -3,9 +3,9 @@ const WebSocket = require("ws");
 const axios = require("axios");
 const readline = require("readline");
 
-const BATCH_SIZE = 20;
-const BATCH_TIME = 2;
-const INTERVAL = 10000; // 10s
+const BATCH_SIZE = 30;
+const BATCH_TIME = 100;
+const INTERVAL = 20000; // 20s
 
 const rl = readline.createInterface({
   input: process.stdin,
