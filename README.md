@@ -1,27 +1,17 @@
-# 便宜Twitter令牌号：[hdd.cm](https://hdd.cm/)  单价低至0.2元
-
-**适用于所有EVM链**
-
-**适用于所有EVM链**
-
-# 依赖：
-```
-pip install web3
-pip install httpx
-```
+# Fork from （Fooyao）
+https://github.com/Fooyao/evmink
 
 
-# 自动打包
-右边Releases里打包好的exe是Github Action自动打包
+## 修改成Nodejs脚本
 
-打包脚本[.github/workflows/main.yml](.github/workflows/main.yml)
-
-可以自行Fork仓库，自己去Action→发布软件→Run workflow
-
-等待若干时间，会自动帮你打包好并发布到Releases。
+1. 去掉了手动输入to，改为私钥的地址（自转）
+2. 支持使用WSS RPC
+3. 删掉了`maxFeePerGas`，只使用`maxPriorityFeePerGas`
+4. 手动修改一次批量的数量和打的次数
 
 
-# 使用教程
+## Python 脚本（原作者代码未改动）
+### 使用教程
 
 1. **输入地址**：这是你接收铭文的地址
 2. **输入私钥**：付gas账号私钥
