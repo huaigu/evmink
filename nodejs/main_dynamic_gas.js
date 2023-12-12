@@ -1,11 +1,11 @@
-const ethers = require("ethers");
+const Web3 = require("web3");
 const WebSocket = require("ws");
 const axios = require("axios");
 const readline = require("readline");
 
 const BATCH_SIZE = 10;
 const BATCH_TIME = 1000;
-const INTERVAL = 30 * 1000; // 20s
+const INTERVAL = 20 * 1000; // 20s
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -38,44 +38,37 @@ function createOpenPromise(url) {
   });
 }
 
-async function mint(
-  rpc,
-  private_key,
-  gasPrice,
-  maxFeePerGas,
-  maxPriorityFeePerGas,
-  data
-) {
-  let provider = null;
+async function mint(rpc, private_key, gasPrice, maxPriorityFeePerGas, data) {
+  let web3 = null;
+  let ws = null;
   let isHttp = true;
   if (rpc.indexOf("https://") === 0) {
-    provider = new ethers.providers.JsonRpcProvider(rpc);
-    // provider = new ethers.providers.JsonRpcBatchProvider(rpc);
+    web3 = new Web3(rpc);
   } else {
     // new web3 with ws provider
     isHttp = false;
-    provider = new ethers.providers.WebsocketProvider(rpc);
+    web3 = new Web3(new Web3.providers.WebsocketProvider(rpc));
     ws = await createOpenPromise(rpc);
   }
 
-  let chain_id;
-  try {
-    chain_id = (await provider.getNetwork()).chainId;
-    console.log(`chain_id: ${chain_id}`)
-  } catch (err) {
-    console.log("can not get chain id");
-    console.log(err);
-    return;
-  }
+  const account = web3.eth.accounts.privateKeyToAccount(private_key);
 
-  // ethers to account
-  const account = new ethers.Wallet(private_key);
+  const chain_id = await web3.eth.getChainId();
+  console.log(`chain_id: ${chain_id}`);
+  // to = web3.utils.toChecksumAddress(to);
 
-  console.log("getting nonce...");
-  let nonce = await provider.getTransactionCount(account.address);
-  const gasPriceWei = ethers.utils.parseUnits(gasPrice.toString(), "gwei");
+  let nonce = await web3.eth.getTransactionCount(account.address);
+  console.log(`nonce: ${nonce}`);
+  // if (gasPrice > 0) {
+  //   gasPriceWei =
+  //     (await web3.eth.getGasPrice()) +
+  //     web3.utils.toWei(gasPrice.toString(), "gwei");
+  //     // console gas price in gwei
+  //     console.log(`Gas price was set to ${gasPriceWei /1e9 } gwei`);
+  // }
+  // const gasPriceWei = web3.utils.toWei(gasPrice.toString(), "gwei");
   // const maxFeePerGasWei = web3.utils.toWei(maxFeePerGas.toString(), 'gwei');
-  const maxPriorityFeePerGasWei = ethers.utils.parseUnits(
+  const maxPriorityFeePerGasWei = web3.utils.toWei(
     maxPriorityFeePerGas.toString(),
     "gwei"
   );
@@ -85,9 +78,8 @@ async function mint(
     to: account.address, // mint to self
     nonce: nonce,
     gas: 25024,
-    gasPrice: gasPriceWei,
     // maxFeePerGas: maxFeePerGasWei,
-    maxPriorityFeePerGas: maxPriorityFeePerGasWei, // only set maxPriorityFeePerGas
+    // maxPriorityFeePerGas: maxPriorityFeePerGasWei, // only set maxPriorityFeePerGas
     chainId: chain_id,
     data: data,
   };
@@ -95,7 +87,6 @@ async function mint(
   if (gasPrice === 0) {
     delete tx.gasPrice;
   } else {
-    delete tx.maxFeePerGas;
     delete tx.maxPriorityFeePerGas;
   }
 
@@ -118,9 +109,29 @@ async function mint(
   }
 
   for (let x = 0; x < BATCH_TIME; x++) {
+    let gasPriceWei;
     const request_list = [];
+    if (gasPrice > 0) {
+      try {
+        let network_gas = await web3.eth.getGasPrice();
+        console.log(`network gas price: ${network_gas}`);
+        console.log(
+          `add gas price: ${web3.utils.toWei(gasPrice.toString(), "gwei")}`
+        );
+
+        gasPriceWei =
+          parseInt(network_gas) +
+          parseInt(web3.utils.toWei(gasPrice.toString(), "gwei"));
+      } catch {
+        gasPriceWei = web3.utils.toWei("20", "gwei");
+      }
+      // console gas price in gwei
+      console.log(`Gas price was set to ${gasPriceWei / 1e9} gwei`);
+    }
+
     for (let i = 0; i < BATCH_SIZE; i++) {
       tx.nonce = nonce;
+      tx.gasPrice = gasPriceWei;
       if (subtext !== null) {
         tx.data = data.replace(subtext, start.toString());
         start += 1;
@@ -135,7 +146,7 @@ async function mint(
         jsonrpc: "2.0",
         method: "eth_sendRawTransaction",
         params: [signed.rawTransaction],
-        id: nonce + 1,
+        id: nonce,
       });
     }
 
@@ -204,7 +215,7 @@ async function main() {
   } else {
     _gasPrice = await getInput(
       "输入gasPrice：",
-      (gasPrice) => parseFloat(gasPrice) > 0,
+      (gasPrice) => true,
       "gasPrice必须大于0, 请检查后重新输入"
     );
     _maxFeePerGas = 0;
@@ -217,33 +228,14 @@ async function main() {
     "data不能为空, 请检查后重新输入"
   );
 
-  await mint(
-    _rpc,
-    _private_key,
-    _gasPrice,
-    _maxFeePerGas,
-    _maxPriorityFeePerGas,
-    _data
-  );
-}
-
-async function test() {
-  const _rpc = await getInput(
-    "输入RPC：",
-    (rpc) => rpc.startsWith("https://") || rpc.startsWith("wss://"),
-    "RPC格式不对, 请检查后重新输入"
-  );
-
-  await mint(
-    _rpc,
-  );
+  await mint(_rpc, _private_key, _gasPrice, _maxPriorityFeePerGas, _data);
 }
 
 main()
   .then(() => {
     rl.close();
   })
-  .catch((err) => {
-    console.log(err);
+  .catch((ex) => {
+    console.log(ex);
     rl.close();
   });
